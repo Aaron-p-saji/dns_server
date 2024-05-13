@@ -1,0 +1,18 @@
+{
+  "name": "dns-test-server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Aaron",
+  "license": "Apache-2.0",
+  "description": "",
+  "dependencies": {
+    "dns-packet": "^5.6.1",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.4.1",
+    "nodemon": "^3.1.0",
+    "redis": "^4.6.13"
+  }
+}
