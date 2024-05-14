@@ -18,7 +18,7 @@ out/
 
 # Environment variables
 .env
-.pem
+*.pem
 
 # IDE files
 .vscode/
