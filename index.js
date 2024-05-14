@@ -16,7 +16,7 @@ async function main() {
   })
     .on("error", (err) => console.log("Redis Client Error ❌", err))
     .on("connect", () => {
-      console.log("%cConnection to the DB Successfull ✅", "color: green");
+      console.log("\x1b[36m%s\x1b[0m", "Connection to the DB Successfull ✅");
     })
     .connect();
 
