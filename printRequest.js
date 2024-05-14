@@ -11,13 +11,8 @@ const table = new Table({
 });
 
 async function requests(requests) {
-  const request = Array(requests);
-  if (request.length === 0) {
-    console.log(table.toString());
-  } else {
-    table.push(request);
-    console.log(table.toString());
-  }
+  table.push(requests);
+  console.log(table.toString());
 }
 
 module.exports = requests;

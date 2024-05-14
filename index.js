@@ -8,8 +8,10 @@ const requests = require("./printRequest");
 const { createSpinner } = require("nanospinner");
 require("dotenv/config");
 
+let sno = 0;
+let isServerReady = false;
+
 async function main() {
-  let sno = 0;
   const server = createSocket("udp4");
   const client = await createClient({
     password: process.env.REDIS_PASSWORD,
@@ -42,6 +44,17 @@ async function main() {
 
 async function mainLogic(server, client, sno) {
   server.on("message", async (msg, rinfo) => {
+    if (!isServerReady) {
+      const errorResponse = encode({
+        type: "response",
+        id: decode(msg).id,
+        flags: 0,
+        responseCode: 5,
+        questions: decode(msg).questions,
+      });
+      server.send(errorResponse, rinfo.port, rinfo.address);
+      return;
+    }
     const IncMsg = decode(msg);
     const domain = IncMsg.questions[0].name;
     console.clear();
@@ -49,7 +62,7 @@ async function mainLogic(server, client, sno) {
     printBanner();
 
     try {
-      sno += 1; // Await the Promise to get the actual IP from Redis
+      sno += 1;
       let ipFromDB = await client.LRANGE(domain, -100, 100);
 
       if (ipFromDB.length !== 0) {
@@ -64,7 +77,7 @@ async function mainLogic(server, client, sno) {
             type: "A",
             class: "IN",
             name: IncMsg.questions[0].name,
-            data: value, // Single IP address from the set
+            data: value,
           })),
         });
         server.send(ans, rinfo.port, rinfo.address);
@@ -73,32 +86,30 @@ async function mainLogic(server, client, sno) {
         try {
           sno += 1;
           console.log("Fetching from Alternate DNS");
-          const dnsResponse = await resolveDNS(domain).then((rep) => {
-            const uniqueIps = new Set(ipFromDB);
-            const ans = encode({
-              type: "response",
-              id: IncMsg.id,
-              flags: AUTHORITATIVE_ANSWER,
-              questions: IncMsg,
-              additionals: IncMsg.additionals,
-              answers: Array.from(uniqueIps).map((value) => ({
-                type: "A",
-                class: "IN",
-                name: IncMsg.questions[0].name,
-                data: value, // Single IP address from the set
-              })),
-            });
-            server.send(ans, rinfo.port, rinfo.address);
-            requests([sno, rinfo.address, domain, "Alternate DNS"]);
+          const dnsResponse = await resolveDNS(domain);
+          const uniqueIps = new Set(ipFromDB);
+          const ans = encode({
+            type: "response",
+            id: IncMsg.id,
+            flags: AUTHORITATIVE_ANSWER,
+            questions: IncMsg,
+            additionals: IncMsg.additionals,
+            answers: Array.from(uniqueIps).map((value) => ({
+              type: "A",
+              class: "IN",
+              name: IncMsg.questions[0].name,
+              data: value,
+            })),
           });
+          server.send(ans, rinfo.port, rinfo.address);
+          requests([sno, rinfo.address, domain, "Alternate DNS"]);
         } catch (error) {
-          // If resolution fails, return an error response or a default IP (e.g., "0.0.0.0")
           console.error(`DNS resolution error for ${domain}: ${error}`);
-          ipFromDB = "0.0.0.0"; // Or your preferred error handling
+          ipFromDB = "0.0.0.0";
         }
       }
     } catch (error) {
-      console.error(`Redis Error: ${error}`); // Handle Redis errors gracefully (e.g., return an error DNS response)
+      console.error(`Redis Error: ${error}`);
     }
   });
 
@@ -112,8 +123,8 @@ async function mainLogic(server, client, sno) {
         });
       });
     } catch (error) {
-      console.error(`DNS D resolution error for ${domain}: ${error}`); // Handle the error appropriately (e.g., return a default IP)
-      return "0.0.0.0"; // Or a more specific error code
+      console.error(`DNS D resolution error for ${domain}: ${error}`);
+      return "0.0.0.0";
     }
   }
 }
@@ -122,15 +133,15 @@ async function startServer() {
   let countdown = 5;
   const countdownInterval = setInterval(() => {
     spinner.update({
-      text: `Starting in ${countdown}`, // Update text with countdown
+      text: `Starting in ${countdown}`,
     });
     countdown--;
     if (countdown < 0) {
       clearInterval(countdownInterval);
-      spinner.success({ text: "DNS Server started!" }); // Success message
+      spinner.success({ text: "DNS Server started!" });
+      isServerReady = true;
     }
   }, 1000);
 }
-startServer().then(() => {
-  main();
-});
+startServer();
+main();
